@@ -19,6 +19,57 @@
             padding: 0;
             margin: 0;
         }
+        /* popup media styling: make embedded media fill the popup content area
+           Use flex so the media (iframe/video/audio) expands to available height
+           and the fallback link stays pinned toward the bottom. */
+        .leaflet-popup-content {
+            display: flex;
+            flex-direction: column;
+            min-width: 620px;
+            /* let Leaflet's popup option `maxHeight` control overall height */
+            max-height: none;
+        }
+        .popup-body {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .popup-table {
+            flex: 0 0 auto;
+            width: 100%;
+            overflow: auto;
+        }
+        #pdf_container {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-end;
+            width: 100%;
+        }
+        .leaflet-popup-content .media {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .leaflet-popup-content .media iframe,
+        .leaflet-popup-content .media video,
+        .leaflet-popup-content .media audio {
+            border: none;
+            flex: 1 1 auto;
+            min-width: 600px;
+            min-height: 600px;
+            width: 600px;
+            height: 600px;
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+        .leaflet-popup-content .media a {
+            margin-top: 0.5rem;
+            align-self: flex-end;
+        }
         </style>
         <title>City Wide Models</title>
     </head>
@@ -78,46 +129,83 @@
         function addClassToPopupIfMedia(content, popup) {
             var tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
+            // handle images/audio/video already present in content
             var imgTd = tempDiv.querySelector('td img');
             if (imgTd) {
                 var src = imgTd.getAttribute('src');
                 if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
                     popup._contentNode.classList.add('media');
-                    setTimeout(function() {
-                        popup.update();
-                    }, 10);
+                    setTimeout(function() { popup.update(); }, 10);
                 } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
                     var audio = document.createElement('audio');
                     audio.controls = true;
                     audio.src = src;
                     imgTd.parentNode.replaceChild(audio, imgTd);
                     popup._contentNode.classList.add('media');
-                    setTimeout(function() {
-                        popup.setContent(tempDiv.innerHTML);
-                        popup.update();
-                    }, 10);
+                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
                 } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
                     var video = document.createElement('video');
                     video.controls = true;
                     video.src = src;
-                    video.style.width = "400px";
-                    video.style.height = "300px";
                     video.style.maxHeight = "60vh";
-                    video.style.maxWidth = "60vw";
                     imgTd.parentNode.replaceChild(video, imgTd);
                     popup._contentNode.classList.add('media');
-                    // Aggiorna il popup quando il video carica i metadati
-                    video.addEventListener('loadedmetadata', function() {
-                        popup.update();
-                    });
-                    setTimeout(function() {
-                        popup.setContent(tempDiv.innerHTML);
-                        popup.update();
-                    }, 10);
+                    video.addEventListener('loadedmetadata', function() { popup.update(); });
+                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
                 } else {
                     popup._contentNode.classList.remove('media');
                 }
-            } else {
+            }
+
+            // detect links to PDFs (commonly autolinked) and embed them in an iframe
+            var link = tempDiv.querySelector('td a');
+            if (link) {
+                var href = link.getAttribute('href');
+                if (/\.pdf(\?|$)/i.test(href)) {
+                    var container = document.createElement('div');
+                    container.className = 'media';
+                    var iframe = document.createElement('iframe');
+                    iframe.src = href;
+                    iframe.setAttribute('loading', 'lazy');
+                    iframe.style.border = 'none';
+                    iframe.style.flex = '1 1 auto';
+                    iframe.style.minWidth = '600px';
+                    iframe.style.minHeight = '600px';
+                    iframe.style.width = '600px';
+                    iframe.style.height = '600px';
+                    iframe.style.maxWidth = '90vw';
+                    iframe.style.maxHeight = '90vh';
+                    // fallback/open in new tab link
+                    var openLink = document.createElement('a');
+                    openLink.href = href;
+                    openLink.target = '_blank';
+                    openLink.rel = 'noopener noreferrer';
+                    openLink.textContent = 'Open PDF in new tab';
+                    openLink.style.display = 'block';
+                    openLink.style.marginTop = '0.5rem';
+                    openLink.style.alignSelf = 'flex-end';
+                    container.style.display = 'flex';
+                    container.style.flexDirection = 'column';
+                    container.appendChild(iframe);
+                    container.appendChild(openLink);
+
+                    // prefer placing the viewer in the dedicated pdf container row
+                    var pdfContainerTd = tempDiv.querySelector('#pdf_container');
+                    if (pdfContainerTd) {
+                        // insert viewer into the dedicated cell and keep the original link in Document_P
+                        pdfContainerTd.appendChild(container);
+                    } else {
+                        // fallback: replace the original link with the viewer
+                        link.parentNode.replaceChild(container, link);
+                    }
+
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
+                    return;
+                }
+            }
+            // if we reach here and no media found, ensure class is removed
+            if (!tempDiv.querySelector('.media')) {
                 popup._contentNode.classList.remove('media');
             }
         }
@@ -171,7 +259,7 @@
                 },
                 mouseover: highlightFeature,
             });
-            var popupContent = '<table>\
+            var popupContent = '<div class="popup-body"><div class="popup-table"><table>\
                     <tr>\
                         <th scope="row">Location_C</th>\
                         <td>' + (feature.properties['Location_C'] !== null ? autolinker.link(String(feature.properties['Location_C']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
@@ -216,12 +304,13 @@
                         <th scope="row">EPSG4326_y</th>\
                         <td>' + (feature.properties['EPSG4326_y'] !== null ? autolinker.link(String(feature.properties['EPSG4326_y']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
                     </tr>\
-                </table>';
+                </table></div>\
+                <div id="pdf_container"></div></div>';
             var content = removeEmptyRowsFromPopupContent(popupContent, feature);
-			layer.on('popupopen', function(e) {
-				addClassToPopupIfMedia(content, e.popup);
-			});
-			layer.bindPopup(content, { maxHeight: 400 });
+            layer.on('popupopen', function(e) {
+                addClassToPopupIfMedia(content, e.popup);
+            });
+            layer.bindPopup(content, { maxHeight: 800 });
         }
 
         function style_SiteLocations_1_0() {
