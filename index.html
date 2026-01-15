@@ -13,18 +13,122 @@
         <link rel="stylesheet" href="css/leaflet.photon.css">
         <link rel="stylesheet" href="css/leaflet-measure.css">
         <style>
-        html, body, #map {
+        html, body {
             width: 100%;
             height: 100%;
             padding: 0;
             margin: 0;
         }
+        /* Header + map layout */
+        #app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 64px;
+            background: #000;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.32);
+            z-index: 1200;
+            padding: 0 12px;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-weight: 700;
+        }
+        #app-header .header-inner { display:flex; align-items:center; width:100%; }
+        #app-header .header-left { display:flex; align-items:center; }
+        #app-header #header-logo { height:40px; margin-right:12px; }
+        #app-header .header-center { flex:1 1 auto; text-align:left; }
+        #app-header .header-center h1 { margin:0; font-size:18px; font-weight:700; color:#fff; font-family:inherit; }
+        #app-header .header-center .version { font-size:12px; margin-left:8px; color:#ddd; font-weight:600; }
+        #app-header .header-right { display:flex; gap:8px; align-items:center }
+        #app-header .hd-btn { background:transparent; border:none; font-size:16px; cursor:pointer; padding:8px; border-radius:4px; color:inherit; }
+        #app-header .hd-btn:hover { background:rgba(255,255,255,0.06); }
+        #app-header .hd-btn i { color:inherit; }
+
+        #map {
+            position: absolute;
+            top: 64px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: calc(100% - 64px);
+        }
+        /* popup media styling: make embedded media fill the popup content area
+           Use flex so the media (iframe/video/audio) expands to available height
+           and the fallback link stays pinned toward the bottom. */
+        .leaflet-popup-content {
+            display: flex;
+            flex-direction: column;
+            min-width: 620px;
+            /* let Leaflet's popup option `maxHeight` control overall height */
+            max-height: none;
+        }
+        .popup-body {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+        .popup-table {
+            flex: 0 0 auto;
+            width: 100%;
+            overflow: auto;
+        }
+        #pdf_container {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-end;
+            width: 100%;
+        }
+        .leaflet-popup-content .media {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .leaflet-popup-content .media iframe,
+        .leaflet-popup-content .media video,
+        .leaflet-popup-content .media audio {
+            border: none;
+            flex: 1 1 auto;
+            min-width: 600px;
+            min-height: 600px;
+            width: 600px;
+            height: 600px;
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+        .leaflet-popup-content .media a {
+            margin-top: 0.5rem;
+            align-self: flex-end;
+        }
         </style>
         <title>City Wide Models</title>
     </head>
     <body>
-        <div id="map">
-        </div>
+        <header id="app-header">
+            <div class="header-inner">
+                <div class="header-left">
+                    <img id="header-logo" src="https://www.arcgis.com/sharing/rest/content/items/a2fbbf6f3289475c8dddeddfca84395c/resources/images/widget_101/1767829219668.png?token=3NKHt6i2urmWtqOuugvr9bd8WzjqKdSdwMomqG6pEiMe8qWlQMRis6Ga38SyhsiX5QgBePLgLN-sjjiRZ4faEi7WrHmoy0DtQUYYHsU6G9Veih9EbhpOGe6OeqszwIQwG3_054AtkJVBeHx88fP0eK5t_YSF7DLeQapiYdYXpj92u9s8nprY2fB7V6sDZTieaUjg99PWs1k_8xgsUOlKyyp6MVusVn2BOmnofEz6TK4OfBMYwYjDWx7sa8EkHdi4" alt="logo">
+                </div>
+                <div class="header-center">
+                    <h1>UAE CITY WIDE MODELS <span class="version">v1.0</span></h1>
+                </div>
+                <div class="header-right">
+                    <button id="btn-basemap" class="hd-btn" title="Basemap"><i class="fas fa-th-large"></i></button>
+                    <button id="btn-add" class="hd-btn" title="Add Data"><i class="fas fa-plus"></i></button>
+                    <button id="btn-legend" class="hd-btn" title="Legend"><i class="fas fa-list"></i></button>
+                    <button id="btn-layers" class="hd-btn" title="Map Layers"><i class="fas fa-layer-group"></i></button>
+                </div>
+            </div>
+        </header>
+        <div id="map"></div>
         <script src="js/qgis2web_expressions.js"></script>
         <script src="js/leaflet.js"></script>
         <script src="js/L.Control.Layers.Tree.min.js"></script>
@@ -78,46 +182,83 @@
         function addClassToPopupIfMedia(content, popup) {
             var tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
+            // handle images/audio/video already present in content
             var imgTd = tempDiv.querySelector('td img');
             if (imgTd) {
                 var src = imgTd.getAttribute('src');
                 if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
                     popup._contentNode.classList.add('media');
-                    setTimeout(function() {
-                        popup.update();
-                    }, 10);
+                    setTimeout(function() { popup.update(); }, 10);
                 } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
                     var audio = document.createElement('audio');
                     audio.controls = true;
                     audio.src = src;
                     imgTd.parentNode.replaceChild(audio, imgTd);
                     popup._contentNode.classList.add('media');
-                    setTimeout(function() {
-                        popup.setContent(tempDiv.innerHTML);
-                        popup.update();
-                    }, 10);
+                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
                 } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
                     var video = document.createElement('video');
                     video.controls = true;
                     video.src = src;
-                    video.style.width = "400px";
-                    video.style.height = "300px";
                     video.style.maxHeight = "60vh";
-                    video.style.maxWidth = "60vw";
                     imgTd.parentNode.replaceChild(video, imgTd);
                     popup._contentNode.classList.add('media');
-                    // Aggiorna il popup quando il video carica i metadati
-                    video.addEventListener('loadedmetadata', function() {
-                        popup.update();
-                    });
-                    setTimeout(function() {
-                        popup.setContent(tempDiv.innerHTML);
-                        popup.update();
-                    }, 10);
+                    video.addEventListener('loadedmetadata', function() { popup.update(); });
+                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
                 } else {
                     popup._contentNode.classList.remove('media');
                 }
-            } else {
+            }
+
+            // detect links to PDFs (commonly autolinked) and embed them in an iframe
+            var link = tempDiv.querySelector('td a');
+            if (link) {
+                var href = link.getAttribute('href');
+                if (/\.pdf(\?|$)/i.test(href)) {
+                    var container = document.createElement('div');
+                    container.className = 'media';
+                    var iframe = document.createElement('iframe');
+                    iframe.src = href;
+                    iframe.setAttribute('loading', 'lazy');
+                    iframe.style.border = 'none';
+                    iframe.style.flex = '1 1 auto';
+                    iframe.style.minWidth = '600px';
+                    iframe.style.minHeight = '600px';
+                    iframe.style.width = '600px';
+                    iframe.style.height = '600px';
+                    iframe.style.maxWidth = '90vw';
+                    iframe.style.maxHeight = '90vh';
+                    // fallback/open in new tab link
+                    var openLink = document.createElement('a');
+                    openLink.href = href;
+                    openLink.target = '_blank';
+                    openLink.rel = 'noopener noreferrer';
+                    openLink.textContent = 'Open PDF in new tab';
+                    openLink.style.display = 'block';
+                    openLink.style.marginTop = '0.5rem';
+                    openLink.style.alignSelf = 'flex-end';
+                    container.style.display = 'flex';
+                    container.style.flexDirection = 'column';
+                    container.appendChild(iframe);
+                    container.appendChild(openLink);
+
+                    // prefer placing the viewer in the dedicated pdf container row
+                    var pdfContainerTd = tempDiv.querySelector('#pdf_container');
+                    if (pdfContainerTd) {
+                        // insert viewer into the dedicated cell and keep the original link in Document_P
+                        pdfContainerTd.appendChild(container);
+                    } else {
+                        // fallback: replace the original link with the viewer
+                        link.parentNode.replaceChild(container, link);
+                    }
+
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
+                    return;
+                }
+            }
+            // if we reach here and no media found, ensure class is removed
+            if (!tempDiv.querySelector('.media')) {
                 popup._contentNode.classList.remove('media');
             }
         }
@@ -130,7 +271,8 @@
         title.update = function () {
             this._div.innerHTML = '<h2>City Wide Models</h2>';
         };
-        title.addTo(map);
+        // Title is shown in the fixed header above; do not add Leaflet map control title to avoid duplication
+        // title.addTo(map);
         var zoomControl = L.control.zoom({
             position: 'topleft'
         }).addTo(map);
@@ -171,7 +313,7 @@
                 },
                 mouseover: highlightFeature,
             });
-            var popupContent = '<table>\
+            var popupContent = '<div class="popup-body"><div class="popup-table"><table>\
                     <tr>\
                         <th scope="row">Location_C</th>\
                         <td>' + (feature.properties['Location_C'] !== null ? autolinker.link(String(feature.properties['Location_C']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
@@ -216,12 +358,13 @@
                         <th scope="row">EPSG4326_y</th>\
                         <td>' + (feature.properties['EPSG4326_y'] !== null ? autolinker.link(String(feature.properties['EPSG4326_y']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
                     </tr>\
-                </table>';
+                </table></div>\
+                <div id="pdf_container"></div></div>';
             var content = removeEmptyRowsFromPopupContent(popupContent, feature);
-			layer.on('popupopen', function(e) {
-				addClassToPopupIfMedia(content, e.popup);
-			});
-			layer.bindPopup(content, { maxHeight: 400 });
+            layer.on('popupopen', function(e) {
+                addClassToPopupIfMedia(content, e.popup);
+            });
+            layer.bindPopup(content, { maxHeight: 800 });
         }
 
         function style_SiteLocations_1_0() {
@@ -241,7 +384,7 @@
             }
         }
         map.createPane('pane_SiteLocations_1');
-        map.getPane('pane_SiteLocations_1').style.zIndex = 401;
+        map.getPane('pane_SiteLocations_1').style.zIndex = 405;
         map.getPane('pane_SiteLocations_1').style['mix-blend-mode'] = 'normal';
         var layer_SiteLocations_1 = new L.geoJson(json_SiteLocations_1, {
             attribution: '',
@@ -260,9 +403,60 @@
         });
         bounds_group.addLayer(layer_SiteLocations_1);
         map.addLayer(layer_SiteLocations_1);
+        // add additional basemaps from index_v1.html
+        map.createPane('pane_ESRIStandard_0');
+        map.getPane('pane_ESRIStandard_0').style.zIndex = 400;
+        var layer_ESRIStandard_0 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            pane: 'pane_ESRIStandard_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        map.createPane('pane_OSMStandard_1');
+        map.getPane('pane_OSMStandard_1').style.zIndex = 401;
+        var layer_OSMStandard_1 = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            pane: 'pane_OSMStandard_1',
+            opacity: 1.0,
+            attribution: '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors, CC-BY-SA</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        map.createPane('pane_GoogleHybrid_2');
+        map.getPane('pane_GoogleHybrid_2').style.zIndex = 402;
+        var layer_GoogleHybrid_2 = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleHybrid_2',
+            opacity: 1.0,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data © Google</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        map.createPane('pane_GoogleLabels_4');
+        map.getPane('pane_GoogleLabels_4').style.zIndex = 404;
+        var layer_GoogleLabels_4 = L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleLabels_4',
+            opacity: 1.0,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data © Google</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        map.addLayer(layer_GoogleLabels_4);
+
         var overlaysTree = [
             {label: '<img src="legend/SiteLocations_1.png" /> Site Locations', layer: layer_SiteLocations_1},
-            {label: "ESRI Satellite", layer: layer_ESRISatellite_0, radioGroup: 'bm' },]
+            {label: "Google Labels", layer: layer_GoogleLabels_4},
+            {label: "ESRI Satellite", layer: layer_ESRISatellite_0, radioGroup: 'bm' },
+            {label: "Google Hybrid", layer: layer_GoogleHybrid_2, radioGroup: 'bm' },
+            {label: "OSM Standard", layer: layer_OSMStandard_1, radioGroup: 'bm' },
+            {label: "ESRI Standard", layer: layer_ESRIStandard_0, radioGroup: 'bm' },]
         var lay = L.control.layers.tree(null, overlaysTree,{
             //namedToggle: true,
             //selectorBack: false,
@@ -273,6 +467,32 @@
             collapsed: true,
         });
         lay.addTo(map);
+        // Wire header Legend button to toggle the layers tree control
+        (function wireLegendButton(){
+            function toggleLayersTree() {
+                // preferred: click the control's built-in toggle button
+                var toggle = document.querySelector('.leaflet-control-layers .leaflet-control-layers-toggle');
+                if (toggle) {
+                    toggle.click();
+                    return;
+                }
+                // fallback: show/hide the whole control container
+                var container = document.querySelector('.leaflet-control-layers');
+                if (container) {
+                    if (container.style.display === 'none' || getComputedStyle(container).display === 'none') {
+                        container.style.display = '';
+                    } else {
+                        container.style.display = 'none';
+                    }
+                }
+            }
+            var legendBtn = document.getElementById('btn-legend');
+            if (legendBtn) {
+                legendBtn.addEventListener('click', function() {
+                    toggleLayersTree();
+                });
+            }
+        })();
         map.on("zoomend", function(){
 
                 if (map.hasLayer(layer_SiteLocations_1)) {
