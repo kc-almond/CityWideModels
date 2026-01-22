@@ -18,7 +18,6 @@
             height: 100%;
             padding: 0;
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }
         /* Header + map layout */
         #app-header {
@@ -27,23 +26,24 @@
             left: 0;
             right: 0;
             height: 64px;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: #000;
             color: #fff;
             display: flex;
             align-items: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.32);
             z-index: 1200;
-            padding: 0 20px;
+            padding: 0 12px;
             box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             font-weight: 700;
         }
         #app-header .header-inner { display:flex; align-items:center; width:100%; }
         #app-header .header-left { display:flex; align-items:center; }
-        #app-header #header-logo { height:40px; margin-right:16px; }
+        #app-header #header-logo { height:40px; margin-right:12px; }
         #app-header .header-center { flex:1 1 auto; text-align:left; }
-        #app-header .header-center h1 { margin:0; font-size:18px; font-weight:700; color:#fff; }
-        #app-header .header-center .version { font-size:11px; margin-left:8px; color:#aaa; font-weight:500; background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:12px; }
-        #app-header .header-right { display:flex; gap:4px; align-items:center; }
+        #app-header .header-center h1 { margin:0; font-size:18px; font-weight:700; color:#fff; font-family:inherit; }
+        #app-header .header-center .version { font-size:12px; margin-left:8px; color:#ddd; font-weight:600; }
+        #app-header .header-right { display:flex; gap:8px; align-items:center }
         #app-header .hd-btn { background:transparent; border:none; font-size:16px; cursor:pointer; padding:8px; border-radius:4px; color:inherit; }
         #app-header .hd-btn:hover { background:rgba(255,255,255,0.06); }
         #app-header .hd-btn i { color:inherit; }
@@ -173,13 +173,6 @@
             <div class="popup-pane-header">Add Data</div>
             <div class="popup-pane-content">
                 <p style="text-align: center; color: #999;">Work in progress...</p>
-            </div>
-        </div>
-        <!-- Legend Popup Pane (Custom) -->
-        <div id="legend-popup" class="popup-pane">
-            <div class="popup-pane-header">Legend</div>
-            <div class="popup-pane-content" id="legend-content">
-                <!-- Layer items will be populated here -->
             </div>
         </div>
         <script src="js/qgis2web_expressions.js"></script>
@@ -545,79 +538,19 @@
             {label: "OSM Standard", layer: layer_OSMStandard_1, radioGroup: 'bm' },
             {label: "ESRI Standard", layer: layer_ESRIStandard_0, radioGroup: 'bm' },]
         var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
             collapsed: true,
         });
-        // Keep the original control but hide it completely
+        // Do not auto-add to map; legend button will toggle it
         lay.addTo(map);
         lay._container.style.display = 'none';
-
-        // Build custom legend content with selected layers
-        function populateLegend() {
-            var legendContent = document.getElementById('legend-content');
-            legendContent.innerHTML = '';
-            
-            // Define which layers to show in the custom legend
-            var legendLayers = [
-                {name: 'Location Codes', layer: layer_SiteLocations_1, hasImage: true},
-                {name: 'Google Labels', layer: layer_GoogleLabels_4},
-                {name: 'ESRI Satellite', layer: layer_ESRISatellite_0},
-                {name: 'Google Hybrid', layer: layer_GoogleHybrid_2},
-                {name: 'OSM Standard', layer: layer_OSMStandard_1},
-                {name: 'ESRI Standard', layer: layer_ESRIStandard_0}
-            ];
-            
-            legendLayers.forEach(function(item) {
-                var div = document.createElement('div');
-                div.style.padding = '8px 0';
-                div.style.borderBottom = '1px solid #f0f0f0';
-                
-                var label = document.createElement('label');
-                label.style.display = 'flex';
-                label.style.alignItems = 'center';
-                label.style.cursor = 'pointer';
-                label.style.gap = '8px';
-                
-                var checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.checked = map.hasLayer(item.layer);
-                checkbox.style.cursor = 'pointer';
-                
-                var span = document.createElement('span');
-                span.style.fontSize = '13px';
-                
-                if (item.hasImage) {
-                    var img = document.createElement('img');
-                    img.src = 'legend/SiteLocations_1.png';
-                    img.style.height = '20px';
-                    img.style.marginRight = '4px';
-                    span.appendChild(img);
-                }
-                
-                span.appendChild(document.createTextNode(item.name));
-                
-                label.appendChild(checkbox);
-                label.appendChild(span);
-                
-                // Wire checkbox to toggle layer visibility
-                checkbox.addEventListener('change', function() {
-                    if (this.checked) {
-                        map.addLayer(item.layer);
-                    } else {
-                        map.removeLayer(item.layer);
-                    }
-                });
-                
-                div.appendChild(label);
-                legendContent.appendChild(div);
-            });
-        }
-        
-        // Populate legend initially
-        populateLegend();
-        
-        // Update legend when layers change
-        map.on('layeradd layerremove', populateLegend);
-
+        lay._container.classList.add('popup-pane');
+        lay._container.id = 'legend-popup';
         // Wire header Legend button
         document.getElementById('btn-legend').addEventListener('click', function(e) {
             e.stopPropagation();
@@ -625,11 +558,13 @@
             allPanes.forEach(function(p) {
                 if (p.id !== 'legend-popup') p.classList.remove('active');
             });
-            var legendPane = document.getElementById('legend-popup');
-            if (legendPane) {
-                legendPane.classList.toggle('active');
-                // Update legend content in case layer visibility changed
-                populateLegend();
+            var layersControl = document.querySelector('.leaflet-control-layers');
+            if (layersControl) {
+                if (layersControl.style.display === 'none' || layersControl.style.display === '') {
+                    layersControl.style.display = 'block';
+                } else {
+                    layersControl.style.display = 'none';
+                }
             }
         });
         // Wire Basemap button

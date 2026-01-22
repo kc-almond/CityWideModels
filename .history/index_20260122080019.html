@@ -44,9 +44,9 @@
         #app-header .header-center h1 { margin:0; font-size:18px; font-weight:700; color:#fff; }
         #app-header .header-center .version { font-size:11px; margin-left:8px; color:#aaa; font-weight:500; background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:12px; }
         #app-header .header-right { display:flex; gap:4px; align-items:center; }
-        #app-header .hd-btn { background:transparent; border:none; font-size:16px; cursor:pointer; padding:8px; border-radius:4px; color:inherit; }
-        #app-header .hd-btn:hover { background:rgba(255,255,255,0.06); }
-        #app-header .hd-btn i { color:inherit; }
+        #app-header .hd-btn { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); font-size:16px; cursor:pointer; padding:10px 14px; border-radius:8px; color:#fff; transition:all 0.2s ease; display:flex; align-items:center; gap:6px; }
+        #app-header .hd-btn:hover { background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.2); transform:translateY(-1px); }
+        #app-header .hd-btn.active { background:rgba(59, 130, 246, 0.3); border-color:rgba(59, 130, 246, 0.5); }
 
         #map {
             position: absolute;
@@ -559,11 +559,7 @@
             // Define which layers to show in the custom legend
             var legendLayers = [
                 {name: 'Location Codes', layer: layer_SiteLocations_1, hasImage: true},
-                {name: 'Google Labels', layer: layer_GoogleLabels_4},
-                {name: 'ESRI Satellite', layer: layer_ESRISatellite_0},
-                {name: 'Google Hybrid', layer: layer_GoogleHybrid_2},
-                {name: 'OSM Standard', layer: layer_OSMStandard_1},
-                {name: 'ESRI Standard', layer: layer_ESRIStandard_0}
+                {name: 'Google Labels', layer: layer_GoogleLabels_4}
             ];
             
             legendLayers.forEach(function(item) {
