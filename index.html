@@ -20,7 +20,7 @@
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }
-        /* Header + map layout */
+        /* Fixed header bar with logo, title, and control buttons. */
         #app-header {
             position: fixed;
             top: 0;
@@ -48,6 +48,7 @@
         #app-header .hd-btn:hover { background:rgba(255,255,255,0.06); }
         #app-header .hd-btn i { color:inherit; }
 
+        /* Map container that fills the space below the header. */
         #map {
             position: absolute;
             top: 64px;
@@ -57,9 +58,7 @@
             width: 100%;
             height: calc(100% - 64px);
         }
-        /* popup media styling: make embedded media fill the popup content area
-           Use flex so the media (iframe/video/audio) expands to available height
-           and the fallback link stays pinned toward the bottom. */
+        /* Popup layout using flexbox to allow embedded media to expand vertically while keeping links at bottom. */
         .leaflet-popup-content {
             display: flex;
             flex-direction: column;
@@ -108,7 +107,7 @@
             margin-top: 0.5rem;
             align-self: flex-end;
         }
-        /* Popup pane styling */
+        /* Floating popup panels for legend, basemap selection, and add data controls. */
         .popup-pane {
             position: fixed;
             top: 80px;
@@ -140,6 +139,43 @@
             padding: 12px 16px;
             font-size: 13px;
         }
+        /* Loading spinner animation for shapefile upload. */
+        .loading-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #1a1a1a;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Status message styling for upload feedback. */
+        .upload-status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .upload-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .upload-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .upload-status.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
         </style>
         <title>City Wide Models</title>
     </head>
@@ -147,7 +183,7 @@
         <header id="app-header">
             <div class="header-inner">
                 <div class="header-left">
-                    <img id="header-logo" src="https://www.arcgis.com/sharing/rest/content/items/a2fbbf6f3289475c8dddeddfca84395c/resources/images/widget_101/1767829219668.png?token=3NKHt6i2urmWtqOuugvr9bd8WzjqKdSdwMomqG6pEiMe8qWlQMRis6Ga38SyhsiX5QgBePLgLN-sjjiRZ4faEi7WrHmoy0DtQUYYHsU6G9Veih9EbhpOGe6OeqszwIQwG3_054AtkJVBeHx88fP0eK5t_YSF7DLeQapiYdYXpj92u9s8nprY2fB7V6sDZTieaUjg99PWs1k_8xgsUOlKyyp6MVusVn2BOmnofEz6TK4OfBMYwYjDWx7sa8EkHdi4" alt="logo">
+                    <img id="header-logo" src="https://www.arcgis.com/sharing/rest/content/items/a2fbbf6f3289475c8dddeddfca84395c/resources/images/widget_101/1767829219668.png?token=3NKHt6i2urmWtqOuugvr9bd8WzjqKdSdwMomqG6pEiMe8qWlQMRis6Ga38SyhsiX5QgBePLgLN-sjjiRZ4faEi7WrHmoy0DtQUYYHsU6G9V85OeosQHYolZcpAa29Y2w8mHHfRs5m7I3xklGCtKLFAsgrZKfue3KcVWqY3X5LqCteb1CAjur6ibl2W4PQZ9PvoxiPej5AFNX58s7sACDaQ_MT0tA5_dLMj6ek2hz7KYT-NiYk7l7GY0jF5kzmmXe" alt="logo">
                 </div>
                 <div class="header-center">
                     <h1>UAE CITY WIDE MODELS <span class="version">v1.0</span></h1>
@@ -164,15 +200,16 @@
         <!-- Basemap Popup Pane -->
         <div id="basemap-popup" class="popup-pane">
             <div class="popup-pane-header">Basemap</div>
-            <div class="popup-pane-content">
-                <p style="text-align: center; color: #999;">Work in progress...</p>
+            <div class="popup-pane-content" id="basemap-content">
+                <!-- Basemap options will be populated here -->
             </div>
         </div>
         <!-- Add Data Popup Pane -->
         <div id="add-data-popup" class="popup-pane">
             <div class="popup-pane-header">Add Data</div>
-            <div class="popup-pane-content">
-                <p style="text-align: center; color: #999;">Work in progress...</p>
+            <div class="popup-pane-content" id="add-data-content">
+                <p style="text-align: center; color: #999; margin: 16px 0;">[WORK IN PROGRESS NOT YET WORKING] There is currently no added data.</p>
+                <button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>
             </div>
         </div>
         <!-- Legend Popup Pane (Custom) -->
@@ -182,6 +219,8 @@
                 <!-- Layer items will be populated here -->
             </div>
         </div>
+        <!-- Hidden file input for shapefile upload -->
+        <input type="file" id="shp-file-input" multiple accept=".shp,.dbf,.shx,.prj" style="display: none;" />
         <script src="js/qgis2web_expressions.js"></script>
         <script src="js/leaflet.js"></script>
         <script src="js/L.Control.Layers.Tree.min.js"></script>
@@ -194,11 +233,173 @@
         <script src="js/labels.js"></script>
         <script src="js/leaflet.photon.js"></script>
         <script src="js/leaflet-measure.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/shpjs@latest/dist/shp.min.js"></script>
         <script src="data/SiteLocations_1.js"></script>
         <script>
         var highlightLayer;
+        /* Array to track dynamically added layers for legend and management. */
+        var dynamicLayers = [];
+        var dynamicLayerCounter = 0;
         
-        // Popup pane toggle function
+        /* Handle shapefile upload by triggering file input dialog. */
+        function handleFileUpload() {
+            document.getElementById('shp-file-input').click();
+        }
+        
+        /* Process selected shapefile and convert to GeoJSON for map display. */
+        document.getElementById('shp-file-input').addEventListener('change', function(e) {
+            var files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            
+            var addDataContent = document.getElementById('add-data-content');
+            addDataContent.innerHTML = '<div class="upload-status loading"><span class="loading-spinner"></span> Processing shapefile...</div>';
+            
+            // Group files by base name (shp, dbf, shx, prj)
+            var fileGroups = {};
+            files.forEach(function(file) {
+                var baseName = file.name.substring(0, file.name.lastIndexOf('.'));
+                if (!fileGroups[baseName]) fileGroups[baseName] = {};
+                var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                fileGroups[baseName][ext] = file;
+            });
+            
+            // Process first valid shapefile group
+            var processed = false;
+            for (var baseName in fileGroups) {
+                var group = fileGroups[baseName];
+                if (group['.shp'] && group['.dbf']) {
+                    processShapefileGroup(group, baseName, addDataContent);
+                    processed = true;
+                    break;
+                }
+            }
+            
+            if (!processed) {
+                addDataContent.innerHTML = '<div class="upload-status error">Error: Must include both .shp and .dbf files</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+            }
+            
+            // Reset file input
+            e.target.value = '';
+        });
+        
+        /* Parse shapefile group and create GeoJSON layer. */
+        function processShapefileGroup(group, baseName, statusElement) {
+            Promise.all([
+                group['.shp'].arrayBuffer(),
+                group['.dbf'].arrayBuffer()
+            ]).then(function(buffers) {
+                try {
+                    var shapefile = shp.combine([
+                        shp.parseShp(buffers[0]),
+                        shp.parseDbf(buffers[1])
+                    ]);
+                    
+                    var geojson = shapefile.features;
+                    if (!geojson || geojson.length === 0) {
+                        statusElement.innerHTML = '<div class="upload-status error">Error: No features found in shapefile</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                        document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+                        return;
+                    }
+                    
+                    createDynamicLayer(geojson, baseName, statusElement);
+                } catch (error) {
+                    statusElement.innerHTML = '<div class="upload-status error">Error: ' + error.message + '</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                    document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+                }
+            }).catch(function(error) {
+                statusElement.innerHTML = '<div class="upload-status error">Error reading files: ' + error.message + '</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+            });
+        }
+        
+        /* Create and add dynamic layer with appropriate styling based on geometry type. */
+        function createDynamicLayer(features, layerName, statusElement) {
+            dynamicLayerCounter++;
+            var layerId = 'dynamic_layer_' + dynamicLayerCounter;
+            var paneId = 'pane_' + layerId;
+            
+            // Create pane for new layer with high z-index
+            map.createPane(paneId);
+            map.getPane(paneId).style.zIndex = 406 + dynamicLayerCounter;
+            
+            // Create GeoJSON layer with styling
+            var geoJsonLayer = L.geoJSON({type: 'FeatureCollection', features: features}, {
+                pane: paneId,
+                style: function(feature) {
+                    return getStyleForGeometry(feature.geometry.type);
+                },
+                pointToLayer: function(feature, latlng) {
+                    return L.circleMarker(latlng, getStyleForGeometry('Point'));
+                },
+                onEachFeature: function(feature, layer) {
+                    var popupContent = '<table style="font-size: 12px; width: 100%;">';
+                    if (feature.properties) {
+                        for (var key in feature.properties) {
+                            var value = feature.properties[key];
+                            popupContent += '<tr><th style="text-align: left; padding: 4px;">' + key + '</th><td style="padding: 4px;">' + (value !== null ? String(value) : '') + '</td></tr>';
+                        }
+                    }
+                    popupContent += '</table>';
+                    layer.bindPopup(popupContent);
+                }
+            });
+            
+            map.addLayer(geoJsonLayer);
+            
+            // Track layer
+            var layerObj = {
+                id: layerId,
+                name: layerName,
+                layer: geoJsonLayer,
+                paneId: paneId
+            };
+            dynamicLayers.push(layerObj);
+            
+            // Update Add Data popup with success message and option to add more
+            statusElement.innerHTML = '<div class="upload-status success">✓ ' + layerName + ' added successfully</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Add more data</button>';
+            document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+            
+            // Update legend
+            populateLegend();
+            
+            // Fit map to new layer bounds
+            var bounds = geoJsonLayer.getBounds();
+            if (bounds.isValid()) {
+                map.fitBounds(bounds, {padding: [50, 50]});
+            }
+        }
+        
+        /* Return styling object based on geometry type. */
+        function getStyleForGeometry(geometryType) {
+            if (geometryType === 'Point' || geometryType === 'MultiPoint') {
+                return {
+                    radius: 6,
+                    fillColor: '#4285F4',
+                    color: '#1a73e8',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                };
+            } else if (geometryType === 'LineString' || geometryType === 'MultiLineString') {
+                return {
+                    color: '#34A853',
+                    weight: 3,
+                    opacity: 0.8
+                };
+            } else if (geometryType === 'Polygon' || geometryType === 'MultiPolygon') {
+                return {
+                    fillColor: '#FBBC04',
+                    color: '#F57C00',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.5
+                };
+            }
+            return {color: '#999'};
+        }
+        
+        /* Toggle popup pane visibility and close other open panes. */
         function togglePopup(paneId) {
             var pane = document.getElementById(paneId);
             var allPanes = document.querySelectorAll('.popup-pane');
@@ -208,7 +409,7 @@
             pane.classList.toggle('active');
         }
         
-        // Close all popups when clicking outside
+        /* Auto-close all popups when user clicks outside them. */
         document.addEventListener('click', function(event) {
             var panes = document.querySelectorAll('.popup-pane');
             var buttons = document.querySelectorAll('.hd-btn');
@@ -231,6 +432,7 @@
             }
         });
         
+        /* Highlight features on hover by applying yellow color. */
         function highlightFeature(e) {
             highlightLayer = e.target;
 
@@ -245,13 +447,14 @@
               });
             }
         }
+        /* Initialize the Leaflet map with zoom controls and set geographic bounds. */
         var map = L.map('map', {
             zoomControl:false, maxZoom:28, minZoom:1
         }).fitBounds([[23.03929019943693,51.96385977183751],[25.782197414121743,57.28631471633466]]);
         var hash = new L.Hash(map);
         map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
         var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
-        // remove popup's row if "visible-with-data"
+        /* Remove empty popup rows and detect media files (PDF, images, video, audio). */
         function removeEmptyRowsFromPopupContent(content, feature) {
          var tempDiv = document.createElement('div');
          tempDiv.innerHTML = content;
@@ -265,7 +468,7 @@
          }
          return tempDiv.innerHTML;
         }
-        // modify popup if contains media
+        /* Embed PDF, image, audio, and video content in popups with appropriate viewers/players. */
         function addClassToPopupIfMedia(content, popup) {
             var tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
@@ -349,6 +552,7 @@
                 popup._contentNode.classList.remove('media');
             }
         }
+        /* Add zoom and measurement controls to the map. */
         var title = new L.Control({'position':'topright'});
         title.onAdd = function (map) {
             this._div = L.DomUtil.create('div', 'info');
@@ -373,9 +577,12 @@
         measureControl.addTo(map);
         document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
         document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        /* Add scale bar to show distance reference on the map. */
+        L.control.scale({position: 'bottomleft', metric: true, imperial: false}).addTo(map);
         var bounds_group = new L.featureGroup([]);
         function setBounds() {
         }
+        /* Create basemap tile layer panes with proper z-index ordering. */
         map.createPane('pane_ESRISatellite_0');
         map.getPane('pane_ESRISatellite_0').style.zIndex = 400;
         var layer_ESRISatellite_0 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -389,6 +596,7 @@
         });
         layer_ESRISatellite_0;
         map.addLayer(layer_ESRISatellite_0);
+        /* Create popup content and event handlers for Site Location point features. */
         function pop_SiteLocations_1(feature, layer) {
             layer.on({
                 mouseout: function(e) {
@@ -454,6 +662,7 @@
             layer.bindPopup(content, { maxHeight: 800 });
         }
 
+        /* Define color, size, and opacity styling for Site Location markers. */
         function style_SiteLocations_1_0() {
             return {
                 pane: 'pane_SiteLocations_1',
@@ -470,6 +679,7 @@
                 interactive: true,
             }
         }
+        /* Create pane for Site Locations and set high z-index to keep points on top of basemaps. */
         map.createPane('pane_SiteLocations_1');
         map.getPane('pane_SiteLocations_1').style.zIndex = 405;
         map.getPane('pane_SiteLocations_1').style['mix-blend-mode'] = 'normal';
@@ -490,7 +700,7 @@
         });
         bounds_group.addLayer(layer_SiteLocations_1);
         map.addLayer(layer_SiteLocations_1);
-        // add additional basemaps from index_v1.html
+        /* Define additional basemap options (ESRI Street, OSM, Google Hybrid, Google Labels). */
         map.createPane('pane_ESRIStandard_0');
         map.getPane('pane_ESRIStandard_0').style.zIndex = 400;
         var layer_ESRIStandard_0 = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
@@ -537,6 +747,7 @@
         });
         map.addLayer(layer_GoogleLabels_4);
 
+        /* Define all layers available in the legend with basemap radio groups and overlay toggles. */
         var overlaysTree = [
             {label: '<img src="legend/SiteLocations_1.png" /> Location Codes', layer: layer_SiteLocations_1},
             {label: "Google Labels", layer: layer_GoogleLabels_4},
@@ -547,24 +758,29 @@
         var lay = L.control.layers.tree(null, overlaysTree,{
             collapsed: true,
         });
-        // Keep the original control but hide it completely
+        /* Initialize layer tree control but hide it; custom legend popup will replace it. */
         lay.addTo(map);
         lay._container.style.display = 'none';
 
-        // Build custom legend content with selected layers
+        /* Dynamically generate legend popup with checkboxes for controlling layer visibility. */
         function populateLegend() {
             var legendContent = document.getElementById('legend-content');
             legendContent.innerHTML = '';
             
-            // Define which layers to show in the custom legend
+            // Define which layers to show in the legend (overlays only, not basemaps)
             var legendLayers = [
-                {name: 'Location Codes', layer: layer_SiteLocations_1, hasImage: true},
-                {name: 'Google Labels', layer: layer_GoogleLabels_4},
-                {name: 'ESRI Satellite', layer: layer_ESRISatellite_0},
-                {name: 'Google Hybrid', layer: layer_GoogleHybrid_2},
-                {name: 'OSM Standard', layer: layer_OSMStandard_1},
-                {name: 'ESRI Standard', layer: layer_ESRIStandard_0}
+                {name: 'Location Codes', layer: layer_SiteLocations_1, hasImage: true}
             ];
+            
+            // Add dynamic layers to legend
+            dynamicLayers.forEach(function(dynLayer) {
+                legendLayers.push({
+                    name: dynLayer.name,
+                    layer: dynLayer.layer,
+                    isDynamic: true,
+                    dynId: dynLayer.id
+                });
+            });
             
             legendLayers.forEach(function(item) {
                 var div = document.createElement('div');
@@ -595,6 +811,25 @@
                 
                 span.appendChild(document.createTextNode(item.name));
                 
+                // Add delete button for dynamic layers
+                if (item.isDynamic) {
+                    var deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.style.background = 'transparent';
+                    deleteBtn.style.border = 'none';
+                    deleteBtn.style.color = '#999';
+                    deleteBtn.style.cursor = 'pointer';
+                    deleteBtn.style.fontSize = '18px';
+                    deleteBtn.style.padding = '0 4px';
+                    deleteBtn.style.marginLeft = 'auto';
+                    deleteBtn.title = 'Remove layer';
+                    deleteBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        removeDynamicLayer(item.dynId);
+                    });
+                    label.appendChild(deleteBtn);
+                }
+                
                 label.appendChild(checkbox);
                 label.appendChild(span);
                 
@@ -612,13 +847,118 @@
             });
         }
         
-        // Populate legend initially
+        /* Remove dynamic layer from map and legend. */
+        function removeDynamicLayer(layerId) {
+            for (var i = 0; i < dynamicLayers.length; i++) {
+                if (dynamicLayers[i].id === layerId) {
+                    map.removeLayer(dynamicLayers[i].layer);
+                    if (map.getPane(dynamicLayers[i].paneId)) {
+                        map.getPane(dynamicLayers[i].paneId).remove();
+                    }
+                    dynamicLayers.splice(i, 1);
+                    populateLegend();
+                    break;
+                }
+            }
+        }
+        
+        /* Populate basemap selection popup with checkbox for Google Labels and radio buttons for exclusive basemap selection. */
+        function populateBasemap() {
+            var basemapContent = document.getElementById('basemap-content');
+            if (!basemapContent) return;
+            basemapContent.innerHTML = '';
+            
+            // Google Labels as checkbox (toggleable overlay)
+            var googleLabelsDiv = document.createElement('div');
+            googleLabelsDiv.style.padding = '8px 0';
+            googleLabelsDiv.style.borderBottom = '1px solid #f0f0f0';
+            
+            var googleLabelsLabel = document.createElement('label');
+            googleLabelsLabel.style.display = 'flex';
+            googleLabelsLabel.style.alignItems = 'center';
+            googleLabelsLabel.style.cursor = 'pointer';
+            googleLabelsLabel.style.gap = '8px';
+            
+            var googleLabelsCheckbox = document.createElement('input');
+            googleLabelsCheckbox.type = 'checkbox';
+            googleLabelsCheckbox.checked = map.hasLayer(layer_GoogleLabels_4);
+            googleLabelsCheckbox.style.cursor = 'pointer';
+            
+            var googleLabelsSpan = document.createElement('span');
+            googleLabelsSpan.style.fontSize = '13px';
+            googleLabelsSpan.appendChild(document.createTextNode('Google Labels'));
+            
+            googleLabelsLabel.appendChild(googleLabelsCheckbox);
+            googleLabelsLabel.appendChild(googleLabelsSpan);
+            
+            googleLabelsCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    map.addLayer(layer_GoogleLabels_4);
+                } else {
+                    map.removeLayer(layer_GoogleLabels_4);
+                }
+                populateBasemap(); // Update UI
+            });
+            
+            googleLabelsDiv.appendChild(googleLabelsLabel);
+            basemapContent.appendChild(googleLabelsDiv);
+            
+            // Basemap options with exclusive radio buttons
+            var basemaps = [
+                {name: 'ESRI Satellite', layer: layer_ESRISatellite_0},
+                {name: 'Google Hybrid', layer: layer_GoogleHybrid_2},
+                {name: 'OSM Standard', layer: layer_OSMStandard_1},
+                {name: 'ESRI Standard', layer: layer_ESRIStandard_0}
+            ];
+            
+            basemaps.forEach(function(item) {
+                var div = document.createElement('div');
+                div.style.padding = '8px 0';
+                div.style.borderBottom = '1px solid #f0f0f0';
+                
+                var label = document.createElement('label');
+                label.style.display = 'flex';
+                label.style.alignItems = 'center';
+                label.style.cursor = 'pointer';
+                label.style.gap = '8px';
+                
+                var radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'basemap-selection';
+                radio.checked = map.hasLayer(item.layer);
+                radio.style.cursor = 'pointer';
+                
+                var span = document.createElement('span');
+                span.style.fontSize = '13px';
+                span.appendChild(document.createTextNode(item.name));
+                
+                label.appendChild(radio);
+                label.appendChild(span);
+                
+                // Wire radio button to switch basemaps exclusively
+                radio.addEventListener('change', function() {
+                    if (this.checked) {
+                        basemaps.forEach(function(bm) {
+                            if (map.hasLayer(bm.layer)) {
+                                map.removeLayer(bm.layer);
+                            }
+                        });
+                        map.addLayer(item.layer);
+                        populateBasemap(); // Update UI
+                    }
+                });
+                
+                div.appendChild(label);
+                basemapContent.appendChild(div);
+            });
+        }
+        
+        /* Initialize legend and update whenever layers change on the map. */
         populateLegend();
         
-        // Update legend when layers change
         map.on('layeradd layerremove', populateLegend);
 
-        // Wire header Legend button
+        /* Wire header buttons to toggle their respective popup panes. */
         document.getElementById('btn-legend').addEventListener('click', function(e) {
             e.stopPropagation();
             var allPanes = document.querySelectorAll('.popup-pane');
@@ -628,69 +968,101 @@
             var legendPane = document.getElementById('legend-popup');
             if (legendPane) {
                 legendPane.classList.toggle('active');
-                // Update legend content in case layer visibility changed
                 populateLegend();
             }
         });
         // Wire Basemap button
         document.getElementById('btn-basemap').addEventListener('click', function(e) {
             e.stopPropagation();
-            togglePopup('basemap-popup');
+            var allPanes = document.querySelectorAll('.popup-pane');
+            allPanes.forEach(function(p) {
+                if (p.id !== 'basemap-popup') p.classList.remove('active');
+            });
+            var basemapPane = document.getElementById('basemap-popup');
+            if (basemapPane) {
+                basemapPane.classList.toggle('active');
+                populateBasemap();
+            }
         });
         // Wire Add Data button
         document.getElementById('btn-add').addEventListener('click', function(e) {
             e.stopPropagation();
             togglePopup('add-data-popup');
         });
-        map.on("zoomend", function(){
-
-                if (map.hasLayer(layer_SiteLocations_1)) {
-                    if (map.getZoom() >= 14 && map.getZoom() <= 19) {
-                        layer_SiteLocations_1.eachLayer(function (layer) {
-                            layer.openTooltip();
-                        });
-                    } else {
-                        layer_SiteLocations_1.eachLayer(function (layer) {
-                            layer.closeTooltip();
-                        });
-                    }
-                }
-        });
+        // Wire Add Data trigger button
+        document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+        
+        /* Debounce function to limit how often expensive operations run. */
+        function debounce(func, wait) {
+            var timeout;
+            return function executedFunction(...args) {
+                var later = function() {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        /* Wrapper for resetLabels with debouncing to prevent performance issues during zoom. */
+        var debouncedResetLabels = debounce(function(layers) {
+            resetLabels(layers);
+        }, 300);
+        
         setBounds();
+        /* Bind tooltips (location code labels) to each Site Location feature with hover-only display. */
         var i = 0;
         layer_SiteLocations_1.eachLayer(function(layer) {
             var context = {
                 feature: layer.feature,
                 variables: {}
             };
-            layer.bindTooltip((layer.feature.properties['Location_C'] !== null?String('<div style="color: #ffffff; font-size: 6pt; font-weight: bold; font-family: \'Open Sans\', sans-serif;">' + layer.feature.properties['Location_C']) + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_SiteLocations_1'});
-            labels.push(layer);
-            totalMarkers += 1;
-              layer.added = true;
-              addLabel(layer, i);
-              i++;
+            // Use bindTooltip with permanent: true for constant display at building scale zoom levels (18-20)
+            layer.bindTooltip((layer.feature.properties['Location_C'] !== null?String('<div style="color: #ffffff; font-size: 10pt; font-weight: bold; font-family: \'Open Sans\', sans-serif; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, -2px 0 0 #000, 2px 0 0 #000, 0 -2px 0 #000, 0 2px 0 #000;">' + layer.feature.properties['Location_C']) + '</div>':''), {permanent: true, offset: [-0, -16], className: 'css_SiteLocations_1'});
+            i++;
         });
-                if (map.hasLayer(layer_SiteLocations_1)) {
-                    if (map.getZoom() >= 14 && map.getZoom() <= 19) {
-                        layer_SiteLocations_1.eachLayer(function (layer) {
-                            layer.openTooltip();
-                        });
-                    } else {
-                        layer_SiteLocations_1.eachLayer(function (layer) {
-                            layer.closeTooltip();
-                        });
+        /* Only open labels for features that are currently inside the map view and within zoom range.
+           This prevents rendering labels for off-screen points and improves performance. */
+        function updateVisibleLabels() {
+            if (!map.hasLayer(layer_SiteLocations_1)) return;
+            var bounds = map.getBounds();
+            var zoom = map.getZoom();
+            var minZoom = 16; // minimum zoom to show labels
+            var maxZoom = 20; // maximum zoom to show labels
+
+            layer_SiteLocations_1.eachLayer(function(layer) {
+                try {
+                    var inView = false;
+                    if (typeof layer.getLatLng === 'function') {
+                        var latlng = layer.getLatLng();
+                        if (latlng) inView = bounds.contains(latlng);
+                    } else if (typeof layer.getBounds === 'function') {
+                        var lb = layer.getBounds();
+                        if (lb && typeof lb.intersects === 'function') inView = bounds.intersects(lb);
                     }
+
+                    if (zoom >= minZoom && zoom <= maxZoom && inView) {
+                        layer.openTooltip();
+                    } else {
+                        layer.closeTooltip();
+                    }
+                } catch (err) {
+                    // ignore any layers that don't support tooltip operations
                 }
-        resetLabels([layer_SiteLocations_1]);
-        map.on("zoomend", function(){
-            resetLabels([layer_SiteLocations_1]);
-        });
-        map.on("layeradd", function(){
-            resetLabels([layer_SiteLocations_1]);
-        });
-        map.on("layerremove", function(){
-            resetLabels([layer_SiteLocations_1]);
-        });
+            });
+        }
+
+        var debouncedUpdateVisibleLabels = debounce(function() {
+            updateVisibleLabels();
+        }, 200);
+
+        // Update labels after map movement, zoom changes, and when layers change
+        map.on('moveend zoomend', debouncedUpdateVisibleLabels);
+        map.on('layeradd layerremove', debouncedUpdateVisibleLabels);
+
+        // Initial population
+        debouncedUpdateVisibleLabels();
         </script>        
     </body>
 </html>
