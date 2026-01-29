@@ -186,7 +186,8 @@
                     <img id="header-logo" src="https://www.arcgis.com/sharing/rest/content/items/a2fbbf6f3289475c8dddeddfca84395c/resources/images/widget_101/1767829219668.png?token=3NKHt6i2urmWtqOuugvr9bd8WzjqKdSdwMomqG6pEiMe8qWlQMRis6Ga38SyhsiX5QgBePLgLN-sjjiRZ4faEi7WrHmoy0DtQUYYHsU6G9V85OeosQHYolZcpAa29Y2w8mHHfRs5m7I3xklGCtKLFAsgrZKfue3KcVWqY3X5LqCteb1CAjur6ibl2W4PQZ9PvoxiPej5AFNX58s7sACDaQ_MT0tA5_dLMj6ek2hz7KYT-NiYk7l7GY0jF5kzmmXe" alt="logo">
                 </div>
                 <div class="header-center">
-                    <h1>UAE CITY WIDE MODELS <span class="version">v1.0</span></h1>
+                     <!--<h1>UAE CITY WIDE MODELS <span class="version">v1.0</span></h1>-->
+                     <h1>UAE CITY WIDE MODELS</h1>
                 </div>
                 <div class="header-right">
                     <button id="btn-basemap" class="hd-btn" title="Basemap"><i class="fas fa-th-large"></i></button>
@@ -296,7 +297,9 @@
                     ]);
                     
                     var geojson = shapefile.features;
+                    
                     if (!geojson || geojson.length === 0) {
+                        console.error('processShapefileGroup: No features found in shapefile');
                         statusElement.innerHTML = '<div class="upload-status error">Error: No features found in shapefile</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
                         document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
                         return;
@@ -304,10 +307,12 @@
                     
                     createDynamicLayer(geojson, baseName, statusElement);
                 } catch (error) {
+                    console.error('processShapefileGroup error:', error);
                     statusElement.innerHTML = '<div class="upload-status error">Error: ' + error.message + '</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
                     document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
                 }
             }).catch(function(error) {
+                console.error('processShapefileGroup file read error:', error);
                 statusElement.innerHTML = '<div class="upload-status error">Error reading files: ' + error.message + '</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
                 document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
             });
@@ -319,54 +324,84 @@
             var layerId = 'dynamic_layer_' + dynamicLayerCounter;
             var paneId = 'pane_' + layerId;
             
+            // Validate features exist
+            if (!features || features.length === 0) {
+                console.error('createDynamicLayer: No features to add');
+                statusElement.innerHTML = '<div class="upload-status error">Error: No valid features found</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+                return;
+            }
+            
             // Create pane for new layer with high z-index
             map.createPane(paneId);
             map.getPane(paneId).style.zIndex = 406 + dynamicLayerCounter;
             
-            // Create GeoJSON layer with styling
-            var geoJsonLayer = L.geoJSON({type: 'FeatureCollection', features: features}, {
-                pane: paneId,
-                style: function(feature) {
-                    return getStyleForGeometry(feature.geometry.type);
-                },
-                pointToLayer: function(feature, latlng) {
-                    return L.circleMarker(latlng, getStyleForGeometry('Point'));
-                },
-                onEachFeature: function(feature, layer) {
-                    var popupContent = '<table style="font-size: 12px; width: 100%;">';
-                    if (feature.properties) {
-                        for (var key in feature.properties) {
-                            var value = feature.properties[key];
-                            popupContent += '<tr><th style="text-align: left; padding: 4px;">' + key + '</th><td style="padding: 4px;">' + (value !== null ? String(value) : '') + '</td></tr>';
+            try {
+                // Create GeoJSON layer with styling
+                var geoJsonLayer = L.geoJSON({type: 'FeatureCollection', features: features}, {
+                    pane: paneId,
+                    style: function(feature) {
+                        return getStyleForGeometry(feature.geometry.type);
+                    },
+                    pointToLayer: function(feature, latlng) {
+                        return L.circleMarker(latlng, getStyleForGeometry('Point'));
+                    },
+                    onEachFeature: function(feature, layer) {
+                        var popupContent = '<table style="font-size: 12px; width: 100%;">';
+                        if (feature.properties) {
+                            for (var key in feature.properties) {
+                                var value = feature.properties[key];
+                                popupContent += '<tr><th style="text-align: left; padding: 4px;">' + key + '</th><td style="padding: 4px;">' + (value !== null ? String(value) : '') + '</td></tr>';
+                            }
                         }
+                        popupContent += '</table>';
+                        layer.bindPopup(popupContent);
                     }
-                    popupContent += '</table>';
-                    layer.bindPopup(popupContent);
+                });
+                
+                // Verify layer has features
+                var layerCount = 0;
+                geoJsonLayer.eachLayer(function() { layerCount++; });
+                if (layerCount === 0) {
+                    console.error('createDynamicLayer: GeoJSON layer created but has no features after rendering');
+                    statusElement.innerHTML = '<div class="upload-status error">Error: Layer created but has no renderable features</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                    document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+                    return;
                 }
-            });
-            
-            map.addLayer(geoJsonLayer);
-            
-            // Track layer
-            var layerObj = {
-                id: layerId,
-                name: layerName,
-                layer: geoJsonLayer,
-                paneId: paneId
-            };
-            dynamicLayers.push(layerObj);
-            
-            // Update Add Data popup with success message and option to add more
-            statusElement.innerHTML = '<div class="upload-status success">✓ ' + layerName + ' added successfully</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Add more data</button>';
-            document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
-            
-            // Update legend
-            populateLegend();
-            
-            // Fit map to new layer bounds
-            var bounds = geoJsonLayer.getBounds();
-            if (bounds.isValid()) {
-                map.fitBounds(bounds, {padding: [50, 50]});
+                
+
+                
+                map.addLayer(geoJsonLayer);
+                
+                // Track layer
+                var layerObj = {
+                    id: layerId,
+                    name: layerName,
+                    layer: geoJsonLayer,
+                    paneId: paneId
+                };
+                dynamicLayers.push(layerObj);
+                
+                // Update Add Data popup with success message and option to add more
+                statusElement.innerHTML = '<div class="upload-status success">✓ ' + layerName + ' (' + layerCount + ' features) added successfully</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Add more data</button>';
+                document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
+                
+                // Update legend
+                populateLegend();
+                
+                // Fit map to new layer bounds and refresh visible labels
+                var bounds = geoJsonLayer.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, {padding: [50, 50]});
+                    // Refresh labels after fitBounds completes
+                    setTimeout(function() {
+                        updateVisibleLabels();
+                    }, 300);
+                }
+            } catch (err) {
+                console.error('createDynamicLayer error:', err);
+                statusElement.innerHTML = '<div class="upload-status error">Error creating layer: ' + err.message + '</div><button id="btn-add-data-trigger" style="background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; box-sizing: border-box;">+ Click to add data</button>';
+                document.getElementById('btn-add-data-trigger').addEventListener('click', handleFileUpload);
             }
         }
         
@@ -500,53 +535,7 @@
                 }
             }
 
-            // detect links to PDFs (commonly autolinked) and embed them in an iframe
-            var link = tempDiv.querySelector('td a');
-            if (link) {
-                var href = link.getAttribute('href');
-                if (/\.pdf(\?|$)/i.test(href)) {
-                    var container = document.createElement('div');
-                    container.className = 'media';
-                    var iframe = document.createElement('iframe');
-                    iframe.src = href;
-                    iframe.setAttribute('loading', 'lazy');
-                    iframe.style.border = 'none';
-                    iframe.style.flex = '1 1 auto';
-                    iframe.style.minWidth = '600px';
-                    iframe.style.minHeight = '600px';
-                    iframe.style.width = '600px';
-                    iframe.style.height = '600px';
-                    iframe.style.maxWidth = '90vw';
-                    iframe.style.maxHeight = '90vh';
-                    // fallback/open in new tab link
-                    var openLink = document.createElement('a');
-                    openLink.href = href;
-                    openLink.target = '_blank';
-                    openLink.rel = 'noopener noreferrer';
-                    openLink.textContent = 'Open PDF in new tab';
-                    openLink.style.display = 'block';
-                    openLink.style.marginTop = '0.5rem';
-                    openLink.style.alignSelf = 'flex-end';
-                    container.style.display = 'flex';
-                    container.style.flexDirection = 'column';
-                    container.appendChild(iframe);
-                    container.appendChild(openLink);
 
-                    // prefer placing the viewer in the dedicated pdf container row
-                    var pdfContainerTd = tempDiv.querySelector('#pdf_container');
-                    if (pdfContainerTd) {
-                        // insert viewer into the dedicated cell and keep the original link in Document_P
-                        pdfContainerTd.appendChild(container);
-                    } else {
-                        // fallback: replace the original link with the viewer
-                        link.parentNode.replaceChild(container, link);
-                    }
-
-                    popup._contentNode.classList.add('media');
-                    setTimeout(function() { popup.setContent(tempDiv.innerHTML); popup.update(); }, 10);
-                    return;
-                }
-            }
             // if we reach here and no media found, ensure class is removed
             if (!tempDiv.querySelector('.media')) {
                 popup._contentNode.classList.remove('media');
@@ -655,7 +644,10 @@
                     </tr>\
                 </table></div>\
                 <div id="pdf_container"></div></div>';
-            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+                var popupHeader = '<div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); color: #fff; padding: 12px 16px; margin: -8px -8px 12px -8px; border-radius: 4px 4px 0 0;"><div style="font-size: 14px; font-weight: 700; color: #ff3333;">' + (feature.properties['Location_C'] || 'Location') + '</div><div style="font-size: 11px; color: #ccc; margin-top: 2px;">Point Location Detail</div></div>';
+                var popupContent_styled = '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; font-size: 12px; color: #1a1a1a;"><style>.popup-detail-row { display: flex; padding: 8px 0; border-bottom: 1px solid #f0f0f0; } .popup-detail-row:last-child { border-bottom: none; } .popup-detail-label { font-weight: 600; color: #1a1a1a; width: 100px; min-width: 100px; color: #cc0000; } .popup-detail-value { color: #333; flex: 1; word-break: break-word; }</style><div style="padding: 8px 0;">' + popupContent.replace(/<table[^>]*>/g, '').replace(/<\/table>/g, '').replace(/<tr>/g, '<div class="popup-detail-row">').replace(/<\/tr>/g, '</div>').replace(/<th[^>]*>/g, '<div class="popup-detail-label">').replace(/<\/th>/g, '</div>').replace(/<td[^>]*>/g, '<div class="popup-detail-value">').replace(/<\/td>/g, '</div>') + '</div></div>';
+                var fullPopupContent = popupHeader + popupContent_styled + '<div id="pdf_container"></div>';
+                var content = removeEmptyRowsFromPopupContent(fullPopupContent, feature);
             layer.on('popupopen', function(e) {
                 addClassToPopupIfMedia(content, e.popup);
             });
